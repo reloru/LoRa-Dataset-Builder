@@ -1,0 +1,17 @@
+{
+  "name": "lora-dataset-builder",
+  "version": "1.0.0",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "description": "Builds trainer-ready ZIPs for Pruna's p-image-trainer and p-image-edit-trainer on a phone, and optionally runs the training. Deployed on Cloudflare Workers.",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "node test/run.mjs",
+    "test:unit": "node --test test/unit.test.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "^4.112.0"
+  }
+}

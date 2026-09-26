@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "lora-dataset-builder",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    // The app itself. Requests with no matching file (the /api/* routes) fall
+    // through to src/worker.js.
+    "directory": "./public"
+  },
+  // Off because Workers Logs invocation logs record every request header in
+  // plain text, and visitors' Pruna keys and Hugging Face tokens travel as
+  // request headers.
+  "observability": {
+    "enabled": false
+  }
+  // No secrets: every Pruna and Hugging Face call is made with the key or
+  // token the visitor enters, sent with that request and never stored here.
+}
