@@ -149,6 +149,9 @@ try {
   ok(/400×300, under Pruna's 512×512 minimum/.test(checkText), "Check: small image flagged");
   ok(/duplicate of Photo 1/.test(checkText), "Check: re-saved duplicate flagged");
   ok(/no caption of their own|no caption/i.test(checkText), "Check: missing captions listed");
+  const groupThumbs = await page.locator("#item-issues .item-group-thumbs img").count();
+  const groups = await page.locator("#item-issues .item-group").count();
+  ok(groups > 0 && groupThumbs === groups, `Check: every flagged photo shows its thumbnail (${groupThumbs}/${groups})`);
 
   const [dl] = await Promise.all([page.waitForEvent("download"), page.click("#download-zip")]);
   const zipPath = path.join(out, "photos.zip");
@@ -227,6 +230,15 @@ try {
   const expected = crypto.createHash("sha256").update(Buffer.alloc(0)).digest("hex");
   ok(commit && commit.lfsFile.path === "weights.safetensors" && commit.lfsFile.size === 300000 && commit.lfsFile.oid !== expected, "HF: weights committed with their SHA-256 and size");
 
+  // Done with this run: both confirmations accepted → LoRA and dataset gone, home screen.
+  await page.click("#finish-run");
+  await page.waitForSelector("#view-start:not(.hidden)");
+  ok((await page.locator("#resume").innerText()).trim() === "", "Done with this run: LoRA and dataset removed, back on the home screen");
+  await page.reload();
+  await page.waitForSelector("#view-start:not(.hidden)");
+  await page.waitForTimeout(300);
+  ok((await page.locator("#resume .banner").count()) === 0, "Done with this run: nothing comes back after a reload");
+
   // ── pairs ────────────────────────────────────────────────────────────────
   await page.goto(W + "/" + q);
   await page.click('.choice[data-mode="pairs"]');
@@ -270,6 +282,15 @@ try {
   const pairsZip = path.join(out, "pairs.zip");
   await dl3.saveAs(pairsZip);
   const pnames = execFileSync("zipinfo", ["-1", pairsZip]).toString().trim().split("\n");
+  await page.goto(W + "/" + q);
+  await page.waitForSelector("#resume .banner");
+  ok(/Dataset in progress: 3 pairs/.test(await page.locator("#resume").innerText()), "Home: dataset banner shows Continue and Delete");
+  await page.click('#resume .banner button:has-text("Delete")');
+  await page.waitForFunction(() => !document.querySelector("#resume .banner"));
+  await page.reload();
+  await page.waitForSelector("#view-start:not(.hidden)");
+  await page.waitForTimeout(300);
+  ok((await page.locator("#resume .banner").count()) === 0, "Home: Delete removes the dataset for good");
   ok(pnames.join() === "pair_000_start.jpg,pair_000_start2.jpg,pair_000_end.jpg,pair_000.txt,pair_001_start.jpg,pair_001_end.jpg", `Pairs ZIP: _start/_start2/_end naming, incomplete pair left out (${pnames.join(" ")})`);
 
   // ── opening an existing ZIP ─────────────────────────────────────────────
