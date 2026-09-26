@@ -26,13 +26,15 @@ Hugging Face.
    from here (the share sheet's *Save to Files* on an iPhone).
 4. **Train** (optional) — enter a Pruna API key (kept only for this visit, or
    remembered on the device if you tick the box), adjust any setting (each
-   shows its range and Pruna's default, and your changes are remembered), and
-   start. The app uploads the ZIP, starts the job, and watches it. Leaving or
+   shows what Pruna allows and its default; every visit starts from the
+   defaults), and start. The app uploads the ZIP, starts the job, and watches it. Leaving or
    closing the app is fine: reopening offers to pick the job back up. When it
    finishes, the LoRA ZIP is downloaded to the phone straight away, since
    Pruna's link expires about 30 minutes after training ends.
-5. **Hugging Face** (optional) — with a *Write* token from
-   [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens), the
+5. **Hugging Face** (optional) — with a token from
+   [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)
+   that can create and write repositories (a *Write* token, or a fine-grained
+   one with those permissions), the
    weights go to a model repository (created if missing, private by default) as
    `weights.safetensors`. The app then shows the exact `lora_weights` value to
    paste into Patchbay; for a private repository Patchbay also needs the token
@@ -61,10 +63,11 @@ pair_000_start.jpg  pair_000_start2.jpg  pair_000_end.jpg  pair_000.txt  …   p
   `_start2`, `_start3`, … Masks are left out: they appear in Pruna's guide but
   not in the API's description of `image_data`.
 - Before and after must be the same size and pixel-aligned. When they differ:
-  same shape → both scaled to one size; different shape → the before is
-  cropped at its center to the after's shape, then both scaled, and the pair
-  is flagged so you can check alignment with **Flip**. Nothing is ever
-  enlarged.
+  same shape → both scaled to one size; different shape → one of them (the
+  before, unless you pick *Crop: After* on that pair) is cropped at its center
+  to the other's shape, then both scaled, and the pair is flagged so you can
+  check alignment with **Flip**. Such pairs keep both originals, so switching
+  sides re-crops at full resolution. Nothing is ever enlarged.
 - The ZIP must stay under 99 MB to train from the app: Pruna's file upload
   refuses anything over 100 MB, and so does Cloudflare's Free plan for request
   bodies. A larger ZIP can still be downloaded.
@@ -112,6 +115,13 @@ Browser (public/)                          Cloudflare Worker (src/worker.js)
   connections to this site only, which keeps any remembered key away from
   injected code.
 
+## Verified live
+
+- **Hugging Face:** a weights file sent through the deployed Worker with a real
+  fine-grained token created a private repository, committed
+  `weights.safetensors`, and downloaded back byte-identical with the same
+  SHA-256.
+
 ## Not yet verified
 
 - **On an iPhone:** HEIC photos, EXIF rotation, the share sheet, and JPEG sizes
@@ -119,8 +129,6 @@ Browser (public/)                          Cloudflare Worker (src/worker.js)
 - **Pruna accepting a ZIP through `/v1/files`:** its spec describes the
   endpoint as for images and video. A refused upload fails before any training
   job is created, so the first real run costs nothing if it does not work.
-- **Hugging Face for real:** the upload was tested against a stand-in that
-  follows the documented protocol, not against huggingface.co.
 
 ## Development
 

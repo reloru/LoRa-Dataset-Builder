@@ -204,7 +204,7 @@ async function hfFail(res, what) {
     const data = JSON.parse(text);
     msg = data.error || data.message || text;
   } catch {}
-  const hint = res.status === 401 || res.status === 403 ? " Check that the token is a Write token." : "";
+  const hint = res.status === 401 || res.status === 403 ? " Check that the token can write to your repositories." : "";
   return new HttpError(`Hugging Face refused ${what} (HTTP ${res.status}): ${String(msg).slice(0, 300)}${hint}`, res.status === 401 || res.status === 403 ? res.status : 502);
 }
 

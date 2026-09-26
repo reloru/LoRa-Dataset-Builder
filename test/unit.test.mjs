@@ -78,6 +78,12 @@ test("planPair: identical, same shape, different shape", () => {
   assert.deepEqual(cropped.afterCrop, { x: 0, y: 0, w: 1024, h: 1024 });
   assert.deepEqual(cropped.size, { w: 1024, h: 1024 });
 
+  const cropAfter = planPair(1600, 1200, 1024, 1024, "after");
+  assert.equal(cropAfter.match, "cropped");
+  assert.deepEqual(cropAfter.beforeCrop, { x: 0, y: 0, w: 1600, h: 1200 });
+  assert.deepEqual(cropAfter.afterCrop, { x: 0, y: 128, w: 1024, h: 768 }, "after cropped at its center to the before's shape");
+  assert.deepEqual(cropAfter.size, { w: 1024, h: 768 });
+
   const tall = planPair(1000, 2000, 1200, 900);
   assert.equal(tall.match, "cropped");
   assert.deepEqual(tall.beforeCrop, { x: 0, y: 625, w: 1000, h: 750 });

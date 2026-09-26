@@ -113,46 +113,49 @@ export async function processSingle(blob, name) {
 //   - identical sizes: nothing to fix;
 //   - same shape (aspect ratios within 1%): both are scaled to one size,
 //     which keeps them aligned;
-//   - different shapes: the before is cropped at its center to the after's
-//     shape (the after is what the model learns to produce, so it is kept
-//     whole), then both are scaled to one size. That lines up only if both
-//     were centered alike, so the pair is flagged for a visual check.
+//   - different shapes: the side the person chose (`cropSide`, the before
+//     unless changed) is cropped at its center to the other's shape, then
+//     both are scaled to one size. That lines up only if both were centered
+//     alike, so the pair is flagged for a visual check.
 // The output is as large as the smaller of the two allows, up to 1024 px:
 // neither image is ever enlarged.
-export function planPair(bw, bh, aw, ah) {
+export function planPair(bw, bh, aw, ah, cropSide = "before") {
   const full = (w, h) => ({ x: 0, y: 0, w, h });
-  const afterCrop = full(aw, ah);
+  const toShape = (w, h, r) => {
+    if (w / h > r) {
+      const cw = Math.round(h * r);
+      return { x: Math.round((w - cw) / 2), y: 0, w: cw, h };
+    }
+    const ch = Math.round(w / r);
+    return { x: 0, y: Math.round((h - ch) / 2), w, h: ch };
+  };
   let beforeCrop = full(bw, bh);
+  let afterCrop = full(aw, ah);
   let match = "none";
   const rb = bw / bh;
   const ra = aw / ah;
   if (bw !== aw || bh !== ah) {
-    if (Math.abs(rb - ra) / rb < 0.01) {
-      match = "scaled";
-    } else {
+    if (Math.abs(rb - ra) / rb < 0.01) match = "scaled";
+    else {
       match = "cropped";
-      if (rb > ra) {
-        const w = Math.round(bh * ra);
-        beforeCrop = { x: Math.round((bw - w) / 2), y: 0, w, h: bh };
-      } else {
-        const h = Math.round(bw / ra);
-        beforeCrop = { x: 0, y: Math.round((bh - h) / 2), w: bw, h };
-      }
+      if (cropSide === "after") afterCrop = toShape(aw, ah, rb);
+      else beforeCrop = toShape(bw, bh, ra);
     }
   }
-  const edge = Math.min(LONG_EDGE, Math.max(beforeCrop.w, beforeCrop.h), Math.max(aw, ah));
-  return { match, beforeCrop, afterCrop, size: fitLongEdge(aw, ah, edge) };
+  const kept = match === "cropped" && cropSide === "after" ? beforeCrop : afterCrop;
+  const edge = Math.min(LONG_EDGE, Math.max(beforeCrop.w, beforeCrop.h), Math.max(afterCrop.w, afterCrop.h));
+  return { match, beforeCrop, afterCrop, size: fitLongEdge(kept.w, kept.h, edge) };
 }
 
-export async function processPair(beforeBlob, afterBlob, beforeName, afterName) {
+export async function processPair(beforeBlob, afterBlob, beforeName, afterName, cropSide = "before") {
   const b = await decode(beforeBlob);
   try {
     const a = await decode(afterBlob);
     try {
-      const plan = planPair(b.width, b.height, a.width, a.height);
+      const plan = planPair(b.width, b.height, a.width, a.height, cropSide);
       const before = { ...(await render(b, plan.beforeCrop, plan.size)), name: beforeName };
       const after = { ...(await render(a, plan.afterCrop, plan.size)), name: afterName };
-      return { before, after, match: plan.match };
+      return { before, after, match: plan.match, crop: plan.match === "cropped" ? cropSide : null };
     } finally {
       a.release();
     }

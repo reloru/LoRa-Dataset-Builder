@@ -295,6 +295,18 @@ function slot(item, side) {
   return h("figure", { class: "slot" }, btn, h("figcaption", { text: img ? `${label} · ${img.w}×${img.h}` : label }));
 }
 
+function setCrop(item, side) {
+  if (item.crop === side || !item.src) return;
+  enqueue(async () => {
+    const bb = new Blob([item.src.before.bytes], { type: item.src.before.type });
+    const ab = new Blob([item.src.after.bytes], { type: item.src.after.type });
+    await applyPair(item, await processPair(bb, ab, item.before.name, item.after.name, side), bb, ab);
+    dropUrls(item.id);
+    await db.putItem(item).catch(storageError);
+    if (state.view === "build") renderItems();
+  });
+}
+
 function pairCard(item, i) {
   const refs = (item.refs || []).map((r, k) =>
     h("div", { class: "ref" },
@@ -315,6 +327,13 @@ function pairCard(item, i) {
       isComplete(item) ? h("button", { type: "button", class: "ghost", onclick: () => openFlip(item) }, "Flip") : null,
       h("button", { type: "button", class: "ghost danger", onclick: () => removeItem(item) }, "Remove")),
     h("div", { class: "pair-row" }, slot(item, "before"), slot(item, "after")),
+    item.match === "cropped" && item.src
+      ? h("div", { class: "crop-choice", role: "group", "aria-label": "Which image to crop" },
+          h("span", { text: "Crop" }),
+          ...["before", "after"].map((s) => h("button", {
+            type: "button", "aria-pressed": item.crop === s ? "true" : "false", onclick: () => setCrop(item, s),
+          }, s === "before" ? "Before" : "After")))
+      : null,
     h("div", { class: "refs" }, refs,
       h("button", { type: "button", class: "ghost add-ref", onclick: () => pickRefs(item) }, "+ Reference image")),
     captionBox(item, "Instruction — describe only the change, e.g. “replace the background with a snowy mountain landscape”"),
@@ -364,21 +383,32 @@ async function addPhoto(file) {
   if (state.view === "build") renderItems();
 }
 
+async function toSrc(blob) {
+  return { bytes: await blob.arrayBuffer(), type: blob.type || "image/jpeg" };
+}
+
+// Applies a processed pair to its item. Pairs of different shapes keep both
+// originals, so switching which side is cropped works from full resolution.
+async function applyPair(item, r, beforeBlob, afterBlob) {
+  item.before = r.before;
+  item.after = r.after;
+  item.match = r.match;
+  item.crop = r.crop;
+  item.src = r.match === "cropped" ? { before: await toSrc(beforeBlob), after: await toSrc(afterBlob) } : null;
+  item.pending_before = item.pending_after = null;
+}
+
 async function fillSlot(item, side, file) {
   const other = side === "before" ? "after" : "before";
-  const otherPending = item["pending_" + other];
-  const otherBlob = otherPending
-    ? new Blob([otherPending.bytes], { type: otherPending.type })
+  const otherOriginal = item["pending_" + other] || (item.src && item.src[other]);
+  const otherBlob = otherOriginal
+    ? new Blob([otherOriginal.bytes], { type: otherOriginal.type })
     : item[other] ? new Blob([item[other].jpeg], { type: "image/jpeg" }) : null;
   if (otherBlob) {
     const beforeBlob = side === "before" ? file : otherBlob;
     const afterBlob = side === "after" ? file : otherBlob;
     const names = side === "before" ? [file.name, item.after && item.after.name] : [item.before && item.before.name, file.name];
-    const r = await processPair(beforeBlob, afterBlob, names[0], names[1]);
-    item.before = r.before;
-    item.after = r.after;
-    item.match = r.match;
-    item.pending_before = item.pending_after = null;
+    await applyPair(item, await processPair(beforeBlob, afterBlob, names[0], names[1], item.crop || "before"), beforeBlob, afterBlob);
   } else {
     item[side] = await processSingle(file, file.name);
     item["pending_" + side] = { bytes: await file.arrayBuffer(), type: file.type || "image/jpeg", name: file.name };
@@ -436,8 +466,9 @@ async function openZip(file) {
         const item = { id: newId(), kind: "pair", caption: p.caption, before: null, after: null, refs: [], match: null };
         try {
           if (p.before && p.after) {
-            const r = await processPair(blobOf(p.before), blobOf(p.after), p.before.name, p.after.name);
-            Object.assign(item, { before: r.before, after: r.after, match: r.match });
+            const bb = blobOf(p.before);
+            const ab = blobOf(p.after);
+            await applyPair(item, await processPair(bb, ab, p.before.name, p.after.name), bb, ab);
           } else {
             const one = p.before || p.after;
             const side = p.before ? "before" : "after";
@@ -536,8 +567,11 @@ function trainer() {
   return { mode, ...TRAINERS[mode] };
 }
 
+// Changed values last for this visit only; every visit starts from Pruna's
+// defaults.
+const sessionParams = {};
 function paramValues(model) {
-  return prefs.get("params." + model, {});
+  return (sessionParams[model] ||= {});
 }
 
 function renderParams() {
@@ -601,7 +635,6 @@ function setParam(key, value) {
   const saved = paramValues(t.model);
   if (PARAMS[key] && value === PARAMS[key].def) delete saved[key];
   else saved[key] = value;
-  prefs.set("params." + t.model, saved);
   renderParams();
 }
 
@@ -897,7 +930,8 @@ async function checkHfToken() {
     const res = await fetch("/api/hf/whoami", { headers: { "x-hf-token": token } });
     if (!res.ok) throw new Error(await readError(res));
     const me = await res.json();
-    who.textContent = `Signed in as ${me.name}${me.role ? ` · ${me.role} token` : ""}.${me.role === "read" ? " A read token can't upload; create a Write token." : ""}`;
+    const role = { write: "Write token", read: "read-only token — uploading needs a Write token", fineGrained: "fine-grained token" }[me.role] || "";
+    who.textContent = `Signed in as ${me.name}${role ? ` · ${role}` : ""}.`;
     const owner = $("hf-owner");
     const keep = owner.value;
     owner.replaceChildren(...[me.name, ...me.orgs].map((n) => h("option", { value: n, selected: n === keep }, n)));

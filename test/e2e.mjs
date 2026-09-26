@@ -252,6 +252,13 @@ try {
   ok(/cropped at its center/.test(card2), "Pairs: different shapes cropped and flagged");
   ok(/Before · 1024×1024/.test(card2) && /After · 1024×1024/.test(card2), "Pairs: both sides end up the same size");
   ok(/Missing the after image/.test(await page.locator("#items .card:nth-child(3)").innerText()), "Pairs: incomplete pair flagged");
+  await page.click('#items .card:nth-child(2) .crop-choice button:has-text("After")');
+  await page.waitForFunction(() => /After · 1024×768/.test(document.querySelector("#items .card:nth-child(2)").innerText));
+  const card2b = await page.locator("#items .card:nth-child(2)").innerText();
+  ok(/Before · 1024×768/.test(card2b) && /the after was cropped/.test(card2b), "Pairs: choosing to crop the after re-crops from the originals (1024×768)");
+  await page.click('#items .card:nth-child(2) .crop-choice button:has-text("Before")');
+  await page.waitForFunction(() => /After · 1024×1024/.test(document.querySelector("#items .card:nth-child(2)").innerText));
+  ok(true, "Pairs: switching back to cropping the before restores 1024×1024");
   await page.click("#items .card:nth-child(2) .card-head button:not(.danger)");
   ok(await page.locator("#flip[open]").count() === 1, "Pairs: Flip compare opens");
   const flipBefore = await page.locator("#flip-label").innerText();

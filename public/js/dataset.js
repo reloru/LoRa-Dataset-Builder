@@ -163,7 +163,9 @@ export function checks(meta, items) {
       else if (!item.after) add(item.id, "warn", "Missing the after image — this pair is left out of the ZIP.");
       if (small(item.before)) add(item.id, "warn", `Before is ${item.before.origW}×${item.before.origH}, under Pruna's ${MIN_SIDE}×${MIN_SIDE} minimum.`);
       if (small(item.after)) add(item.id, "warn", `After is ${item.after.origW}×${item.after.origH}, under Pruna's ${MIN_SIDE}×${MIN_SIDE} minimum.`);
-      if (item.match === "cropped") add(item.id, "warn", "Before and after were different shapes, so the before was cropped at its center to match. Use Flip to check they line up.");
+      if (item.match === "cropped") {
+        add(item.id, "warn", `Before and after were different shapes, so the ${item.crop === "after" ? "after" : "before"} was cropped at its center to match. Use Flip to check they line up${item.src ? ", or crop the other one instead" : ""}.`);
+      }
       if (item.match === "scaled") add(item.id, "note", "Before and after were different sizes; both were scaled to one size.");
       (item.refs || []).forEach((r, k) => {
         if (small(r)) add(item.id, "warn", `Reference ${k + 2} is ${r.origW}×${r.origH}, under Pruna's ${MIN_SIDE}×${MIN_SIDE} minimum.`);
