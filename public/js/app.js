@@ -200,8 +200,22 @@ function renderStart() {
     const n = state.items.length;
     box.append(h("div", { class: "banner" },
       h("p", { text: `Dataset in progress: ${n} ${state.meta.mode === "photos" ? (n === 1 ? "photo" : "photos") : (n === 1 ? "pair" : "pairs")}.` }),
-      h("div", { class: "actions" }, h("button", { type: "button", class: "primary", onclick: () => show("build") }, "Continue"))));
+      h("div", { class: "actions" },
+        h("button", { type: "button", class: "primary", onclick: () => show("build") }, "Continue"),
+        h("button", { type: "button", class: "ghost danger", onclick: () => deleteDataset().then((done) => done && renderStart()) }, "Delete"))));
   }
+}
+
+// Asks, then removes the dataset (photos, pairs, captions) from the phone.
+async function deleteDataset() {
+  const n = state.items.length;
+  const what = state.meta.mode === "photos" ? (n === 1 ? "photo" : "photos") : (n === 1 ? "pair" : "pairs");
+  if (!confirm(`Delete this dataset (${n} ${what} and their captions) from this phone?`)) return false;
+  await db.clearDataset().catch(storageError);
+  for (const i of state.items) dropUrls(i.id);
+  state.items = [];
+  state.meta = null;
+  return true;
 }
 
 function ago(t) {
@@ -525,6 +539,10 @@ function renderCheck() {
     if (!list || !list.length) continue;
     groups.push(h("div", { class: "item-group" },
       h("div", { class: "item-group-head" },
+        h("span", { class: "item-group-thumbs" },
+          ...(item.kind === "photo" ? [["t", item.img]] : [["before", item.before], ["after", item.after]])
+            .filter(([, img]) => img)
+            .map(([k, img]) => h("img", { src: imgUrl(`${item.id}:${k === "t" ? "t" : k + ":" + img.hash}`, img.thumb), alt: "" }))),
         h("strong", { text: itemLabel(state.meta, state.items, item.id) }),
         h("button", { type: "button", class: "ghost", onclick: () => jumpTo(item.id) }, "Show")),
       h("ul", { class: "issues" }, ...list.map((x) => h("li", { class: x.level, text: x.text })))));
@@ -1038,12 +1056,7 @@ function wire() {
     for (const f of e.target.files) enqueue(() => addRef(target.item, f));
   });
   $("start-over").addEventListener("click", async () => {
-    if (!confirm("Delete this dataset from the phone and start over?")) return;
-    await db.clearDataset().catch(storageError);
-    for (const i of state.items) dropUrls(i.id);
-    state.items = [];
-    state.meta = null;
-    show("start");
+    if (await deleteDataset()) show("start");
   });
 
   $("issues-pill").addEventListener("click", () => show("check"));
@@ -1092,7 +1105,8 @@ function wire() {
     state.output = null;
     setJob(null);
     prefs.set("hfResult", null);
-    show(state.meta ? "check" : "start");
+    if (state.meta) await deleteDataset();
+    show("start");
   });
 
   document.addEventListener("visibilitychange", () => {

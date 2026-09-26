@@ -190,7 +190,10 @@ details.panel:not([open]) { padding-bottom: 14px; }
   background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; margin-top: 10px;
 }
 .item-group-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-.item-group-head button { min-height: 34px; padding: 0 12px; font-size: 0.86rem; }
+.item-group-head button { min-height: 34px; padding: 0 12px; font-size: 0.86rem; margin-left: auto; }
+.item-group-head { justify-content: flex-start; }
+.item-group-thumbs { display: flex; gap: 4px; }
+.item-group-thumbs img { width: 44px; height: 44px; object-fit: cover; border-radius: 8px; display: block; }
 table { border-collapse: collapse; width: 100%; font-size: 0.92rem; margin-top: 8px; }
 td { padding: 6px 4px; border-top: 1px solid var(--border); }
 td:last-child { text-align: right; white-space: nowrap; }
