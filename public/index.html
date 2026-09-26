@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>LoRA Dataset Builder</title>
+  <meta name="description" content="Build a trainer-ready ZIP for Pruna's P-Image and P-Image-Edit LoRA trainers on your phone, then train it.">
+  <meta name="theme-color" content="#f6f5f2" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#16161a" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="LoRA Builder">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/icon-180.png">
+  <link rel="icon" href="/icon-192.png">
+  <link rel="stylesheet" href="/styles.css">
+  <script type="module" src="/js/app.js"></script>
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <img class="logo" src="/icon-192.png" alt="" width="34" height="34">
+      <div>
+        <h1>LoRA Dataset Builder</h1>
+        <p class="sub" id="mode-line">For Pruna's LoRA trainers</p>
+      </div>
+    </div>
+    <nav class="steps hidden" id="steps" aria-label="Steps">
+      <button type="button" data-view="build">Build</button>
+      <button type="button" data-view="check">Check</button>
+      <button type="button" data-view="train">Train</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Start -->
+    <section id="view-start" class="view">
+      <div id="resume"></div>
+      <h2>Start a dataset</h2>
+      <button type="button" class="choice" data-mode="photos">
+        <span class="choice-title">Photos + captions</span>
+        <span class="choice-text">Teach P-Image a subject, character, product or style. Trains with <code>p-image-trainer</code>; use the result with <code>p-image-lora</code>.</span>
+      </button>
+      <button type="button" class="choice" data-mode="pairs">
+        <span class="choice-title">Before / after pairs</span>
+        <span class="choice-text">Teach P-Image-Edit an edit. Trains with <code>p-image-edit-trainer</code>; use the result with <code>p-image-edit-lora</code>.</span>
+      </button>
+      <button type="button" class="choice" id="open-zip">
+        <span class="choice-title">Open a ZIP</span>
+        <span class="choice-text">Check and fix a dataset ZIP you already have.</span>
+      </button>
+      <p class="fine">Your photos are resized and packed on this phone. Nothing is uploaded until you choose to train, and then only to Pruna.</p>
+    </section>
+
+    <!-- Build -->
+    <section id="view-build" class="view hidden">
+      <details class="panel" id="settings" open>
+        <summary>Captions</summary>
+        <label class="field">
+          <span class="field-label">Trigger word</span>
+          <input type="text" id="trigger" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="e.g. sks_myconcept">
+          <span class="help">A made-up word you'll use in prompts later to call up what was learned.</span>
+        </label>
+        <label class="check">
+          <input type="checkbox" id="auto-trigger">
+          <span>Add it to the start of every caption <span class="help-inline">(skipped where a caption already has it)</span></span>
+        </label>
+        <label class="field">
+          <span class="field-label">Default caption</span>
+          <textarea id="default-caption" rows="2" placeholder="Used for anything left without a caption"></textarea>
+          <span class="help">Missing captions are flagged on the Check step before this is used.</span>
+        </label>
+      </details>
+
+      <div class="add-bar">
+        <button type="button" class="primary" id="add-photos">Add photos</button>
+        <button type="button" class="primary" id="add-pair">Add pair</button>
+        <button type="button" class="ghost" id="start-over">Start over</button>
+      </div>
+      <div id="notice" class="notice hidden"></div>
+      <div id="progress" class="progress hidden"></div>
+      <ol id="items" class="items"></ol>
+      <p id="empty" class="empty hidden"></p>
+    </section>
+
+    <!-- Check -->
+    <section id="view-check" class="view hidden">
+      <h2>Check</h2>
+      <p id="summary" class="summary"></p>
+      <ul id="global-issues" class="issues big"></ul>
+      <div id="item-issues"></div>
+      <details class="panel" id="recommended">
+        <summary>Pruna's suggested dataset sizes</summary>
+        <table id="rec-table"></table>
+      </details>
+      <details class="panel" id="file-list">
+        <summary>Files in the ZIP</summary>
+        <ol id="files" class="files"></ol>
+      </details>
+      <div class="actions">
+        <button type="button" class="primary" id="download-zip">Download ZIP</button>
+        <button type="button" class="secondary" id="go-train">Train on Pruna</button>
+      </div>
+      <p class="fine" id="train-blocked"></p>
+    </section>
+
+    <!-- Train -->
+    <section id="view-train" class="view hidden">
+      <h2>Train on Pruna</h2>
+      <div class="panel">
+        <label class="field">
+          <span class="field-label">Pruna API key</span>
+          <input type="password" id="pruna-key" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Your key from the Pruna dashboard">
+        </label>
+        <label class="check">
+          <input type="checkbox" id="remember-key">
+          <span>Remember on this device</span>
+        </label>
+        <p class="help">Sent with each request to Pruna through this app's server and never stored there. Keys come from <a href="https://dashboard.pruna.ai/login" target="_blank" rel="noopener">dashboard.pruna.ai</a>.</p>
+      </div>
+
+      <div id="train-setup">
+        <div class="panel">
+          <p class="trainer-line" id="trainer-line"></p>
+          <div id="params"></div>
+          <p class="cost" id="cost"></p>
+          <p class="help" id="time-guide"></p>
+          <label class="check hidden" id="wake-row">
+            <input type="checkbox" id="wake">
+            <span>Keep the screen on while waiting</span>
+          </label>
+        </div>
+        <button type="button" class="primary wide" id="start-training">Upload and start training</button>
+      </div>
+
+      <div id="job" class="panel hidden">
+        <h3 id="job-title">Training</h3>
+        <p id="job-status" class="job-status"></p>
+        <div class="bar"><div id="job-bar"></div></div>
+        <p id="job-detail" class="help"></p>
+        <div class="actions">
+          <button type="button" class="ghost" id="stop-watching">Stop watching</button>
+          <button type="button" class="secondary hidden" id="retry-output">Download the result again</button>
+        </div>
+      </div>
+
+      <div id="result" class="panel hidden">
+        <h3>Your LoRA is ready</h3>
+        <p id="result-detail" class="help"></p>
+        <button type="button" class="primary wide" id="save-lora">Save LoRA ZIP</button>
+
+        <h3 class="gap">Upload to Hugging Face</h3>
+        <p class="help">Pruna's LoRA models load weights from Hugging Face. Use a <em>Write</em> token from <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener">huggingface.co/settings/tokens</a>. The repository is created if it doesn't exist.</p>
+        <label class="field">
+          <span class="field-label">Hugging Face token</span>
+          <input type="password" id="hf-token" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="hf_…">
+        </label>
+        <label class="check">
+          <input type="checkbox" id="remember-hf">
+          <span>Remember on this device</span>
+        </label>
+        <p id="hf-who" class="help"></p>
+        <div class="repo-row">
+          <label class="field">
+            <span class="field-label">Owner</span>
+            <select id="hf-owner"></select>
+          </label>
+          <label class="field grow">
+            <span class="field-label">Repository name</span>
+            <input type="text" id="hf-repo" autocomplete="off" autocapitalize="off" spellcheck="false">
+          </label>
+        </div>
+        <label class="check">
+          <input type="checkbox" id="hf-private" checked>
+          <span>Private repository <span class="help-inline">(Patchbay then needs your token in its Hugging Face API token field)</span></span>
+        </label>
+        <button type="button" class="secondary wide" id="hf-upload">Upload weights</button>
+        <div id="hf-result" class="hf-result hidden">
+          <span class="field-label">LoRA weights — paste into Patchbay</span>
+          <code id="hf-weights"></code>
+          <div class="actions">
+            <button type="button" class="secondary" id="copy-weights">Copy</button>
+            <a id="hf-link" class="button ghost" target="_blank" rel="noopener">Open on Hugging Face</a>
+          </div>
+        </div>
+        <button type="button" class="ghost wide gap" id="finish-run">Done with this run</button>
+      </div>
+    </section>
+  </main>
+
+  <footer class="dock hidden" id="dock">
+    <div class="meter">
+      <div class="meter-text"><span id="meter-size">0 MB</span> <span class="muted" id="meter-limit"></span></div>
+      <div class="bar"><div id="meter-bar"></div></div>
+    </div>
+    <button type="button" class="issues-pill" id="issues-pill"></button>
+    <button type="button" class="primary" id="dock-next">Check</button>
+  </footer>
+
+  <dialog id="flip">
+    <form method="dialog" class="flip-head">
+      <span id="flip-label">Before</span>
+      <button class="ghost" value="close">Close</button>
+    </form>
+    <button type="button" class="flip-stage" id="flip-stage" aria-label="Tap to switch between before and after">
+      <img id="flip-img" alt="">
+    </button>
+    <p class="help center">Tap the image to switch. If things jump around, the two don't line up.</p>
+  </dialog>
+
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
+  <input type="file" id="pick-photos" accept="image/*" multiple hidden>
+  <input type="file" id="pick-one" accept="image/*" hidden>
+  <input type="file" id="pick-refs" accept="image/*" multiple hidden>
+  <input type="file" id="pick-zip" accept=".zip,application/zip" hidden>
+</body>
+</html>
